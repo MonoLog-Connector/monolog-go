@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/process"
 	"github.com/sirupsen/logrus"
 )
 
@@ -99,26 +99,64 @@ func (sdk *GinSDK) GinTrackerMiddleware() gin.HandlerFunc {
 		info := sdk.pool.Get().(*requestInfo)
 		defer sdk.pool.Put(info)
 		start := time.Now()
-		initialCPU, _ := cpu.Percent(0, false)
-		initialMem, _ := mem.VirtualMemory()
-		ctx.Next() // Process the request
-		finalCPU, _ := cpu.Percent(0, false)
-		finalMem, _ := mem.VirtualMemory()
+		proc, err := process.NewProcess(int32(os.Getpid()))
+		if err != nil {
+			sdk.Logger.Errorf("Failed to get process: %v", err)
+			ctx.Next()
+			return
+		}
+		initialCPUTimes, err := proc.Times()
+		if err != nil {
+			sdk.Logger.Errorf("Failed to get initial CPU times: %v", err)
+			ctx.Next()
+			return
+		}
+		initialMem, err := proc.MemoryInfo()
+		if err != nil {
+			sdk.Logger.Errorf("Failed to get initial memory info: %v", err)
+			return
+		}
+		ctx.Next()
+		finalCPUTimes, err := proc.Times()
+		if err != nil {
+			sdk.Logger.Errorf("Failed to get final CPU times: %v", err)
+			return
+		}
+		finalMem, err := proc.MemoryInfo()
+		if err != nil {
+			sdk.Logger.Errorf("Failed to get final memory info: %v", err)
+			return
+		}
+		cpuUsage := sdk.CalculateCPUUsage(initialCPUTimes, finalCPUTimes, start)
+		memoryUsage := int64(finalMem.RSS) - int64(initialMem.RSS)
+
 		info.DateTime = start.Format(time.RFC3339)
 		info.RequestMethod = ctx.Request.Method
 		info.RequestURL = ctx.Request.URL.Path
 		info.Status = ctx.Writer.Status()
 		info.Latency = time.Since(start).String()
-		info.CPUDelta = finalCPU[0] - initialCPU[0]
-		info.MemoryDelta = finalMem.UsedPercent - initialMem.UsedPercent
+		info.CPUDelta = cpuUsage
+		info.MemoryDelta = float64(memoryUsage) / (1024 * 1024)
 		sdk.Logger.WithFields(logrus.Fields{
-			"DateTime":      info.DateTime,
-			"RequestMethod": info.RequestMethod,
-			"RequestURL":    info.RequestURL,
-			"Status":        info.Status,
-			"Latency":       info.Latency,
-			"CPU Delta":     info.CPUDelta,
-			"Memory Delta":  info.MemoryDelta,
+			"DateTime":          info.DateTime,
+			"RequestMethod":     info.RequestMethod,
+			"RequestURL":        info.RequestURL,
+			"Status":            info.Status,
+			"Latency":           info.Latency,
+			"CPU Delta":         info.CPUDelta,
+			"Memory Delta (MB)": info.MemoryDelta,
 		}).Info("Request details logged")
 	}
+}
+
+func (sdk *GinSDK) CalculateCPUUsage(initial, final *cpu.TimesStat, start time.Time) float64 {
+	cpuUser := final.User - initial.User
+	cpuSystem := final.System - initial.System
+	cpuTotal := cpuUser + cpuSystem
+
+	elapsedTime := time.Since(start).Seconds()
+	if elapsedTime > 0 {
+		return (cpuTotal / elapsedTime) * 100
+	}
+	return 0
 }
