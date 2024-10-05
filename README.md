@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/MonoLog-Connector/monolog-go.svg)](https://pkg.go.dev/github.com/MonoLog-Connector/monolog-go/client)
 
-Monolog-Go is a lightweight SDK for tracking logs in Go applications, especially for integrating with the `gin-gonic` framework. It provides a middleware that can be used with the Gin router to track and log requests in a specified log file.
+Monolog-Go is a lightweight SDK for logging and monitoring Go applications. It is designed for easy integration with the `gin-gonic` framework. The SDK provides middleware that tracks and logs request details, including CPU and memory usage, latency, request methods, URLs, and status codes, all written to a specified log file. This makes it ideal for monitoring your application's performance and behavior.
 
 ## Installation
 
