@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -33,8 +34,11 @@ type requestInfo struct {
 	MemoryDelta   float64 `json:"memoryDelta"`
 }
 
-func NewSDK() *GinSDK {
-	logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+func NewSDK(filename string) *GinSDK {
+	logDir := filepath.Dir(filename)
+	_ = os.MkdirAll(logDir, 0755)
+
+	logFile, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		logrus.Fatal(err)
 	}
