@@ -9,7 +9,7 @@ Monolog-Go is a lightweight SDK for logging and monitoring Go applications. It i
 To use the SDK, you need to first install it using `go get`.
 
 ```bash
-go get github.com/MonoLog-Connector/monolog-go/client
+go get github.com/MonoLog-Connector/monolog-go/client@v1.0.0
 ```
 
 ## Usage Example
